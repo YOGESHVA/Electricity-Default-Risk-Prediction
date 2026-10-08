@@ -1,0 +1,203 @@
+import streamlit as st
+
+
+def show_risk_prediction(risk_predictions, customers):
+
+    # --------------------------------------------------
+    # PAGE TITLE
+    # --------------------------------------------------
+
+    st.header("🤖 Risk Prediction & Model Performance")
+
+    st.subheader(
+        "Predict → Explain → Prioritize"
+    )
+
+
+    # --------------------------------------------------
+    # KPI CALCULATIONS
+    # --------------------------------------------------
+
+    risk_scored_customers = (
+        risk_predictions["consumer_id"]
+        .nunique()
+    )
+
+
+    high_risk_customers = risk_predictions.loc[
+        risk_predictions["risk_level"] == "HIGH",
+        "consumer_id"
+    ].nunique()
+
+
+    average_risk_score = (
+        risk_predictions["risk_score"]
+        .mean()
+    )
+
+
+    # --------------------------------------------------
+    # KPI CARDS
+    # --------------------------------------------------
+
+    col1, col2, col3 = st.columns(3)
+
+
+    col1.metric(
+        "Risk Scored Customers",
+        f"{risk_scored_customers:,}"
+    )
+
+
+    col2.metric(
+        "High Risk Customers",
+        f"{high_risk_customers:,}"
+    )
+
+
+    col3.metric(
+        "Average Risk Score",
+        f"{average_risk_score:.2f}"
+    )
+
+
+    # --------------------------------------------------
+    # RISK LEVEL DISTRIBUTION
+    # --------------------------------------------------
+
+    st.subheader(
+        "🎯 Risk Level Distribution"
+    )
+
+
+    risk_distribution = (
+        risk_predictions[
+            "risk_level"
+        ].value_counts()
+    )
+
+
+    st.bar_chart(
+        risk_distribution
+    )
+
+
+    # --------------------------------------------------
+    # HIGH-RISK CUSTOMERS BY ZONE
+    # --------------------------------------------------
+
+    st.subheader(
+        "📍 High-Risk Customers by Zone"
+    )
+
+
+    high_risk = risk_predictions[
+        risk_predictions["risk_level"] == "HIGH"
+    ]
+
+
+    high_risk_zone = (
+        high_risk
+        .merge(
+            customers[
+                ["consumer_id", "zone"]
+            ],
+            on="consumer_id",
+            how="left"
+        )
+        .groupby("zone")[
+            "consumer_id"
+        ]
+        .nunique()
+    )
+
+
+    st.bar_chart(
+        high_risk_zone
+    )
+
+
+    # --------------------------------------------------
+    # AVERAGE RISK SCORE BY ZONE
+    # --------------------------------------------------
+
+    st.subheader(
+        "📊 Average Risk Score by Zone"
+    )
+
+
+    risk_zone = (
+        risk_predictions
+        .merge(
+            customers[
+                ["consumer_id", "zone"]
+            ],
+            on="consumer_id",
+            how="left"
+        )
+        .groupby("zone")[
+            "risk_score"
+        ]
+        .mean()
+    )
+
+
+    st.bar_chart(
+        risk_zone
+    )
+
+
+    # --------------------------------------------------
+    # RISK SCORE DISTRIBUTION
+    # --------------------------------------------------
+
+    st.subheader(
+        "📈 Risk Score Distribution"
+    )
+
+
+    risk_score_data = (
+        risk_predictions[
+            ["risk_score"]
+        ]
+    )
+
+
+    st.line_chart(
+        risk_score_data
+    )
+
+
+    # --------------------------------------------------
+    # CUSTOMER RISK TABLE
+    # --------------------------------------------------
+
+    st.subheader(
+        "👥 Customer Risk Prioritization"
+    )
+
+
+    risk_table = risk_predictions[
+        [
+            "consumer_id",
+            "risk_score",
+            "risk_level",
+            "prediction",
+            "average_bill",
+            "unpaid_count",
+            "late_count"
+        ]
+    ].copy()
+
+
+    risk_table = risk_table.sort_values(
+        "risk_score",
+        ascending=False
+    )
+
+
+    st.dataframe(
+        risk_table,
+        use_container_width=True,
+        hide_index=True
+    )
