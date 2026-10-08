@@ -1,0 +1,151 @@
+import streamlit as st
+
+
+def show_customer_investigation(customers, billing):
+
+    # --------------------------------------------------
+    # PAGE TITLE
+    # --------------------------------------------------
+
+    st.header("🔎 Customer Investigation")
+
+    st.subheader(
+        "Customer 360° — Consumption • Billing • Payment • Anomalies"
+    )
+
+
+    # --------------------------------------------------
+    # CUSTOMER SELECTION
+    # --------------------------------------------------
+
+    customer_list = (
+        customers["consumer_id"]
+        .sort_values()
+        .tolist()
+    )
+
+    selected_customer = st.selectbox(
+        "Select Consumer ID",
+        customer_list
+    )
+
+
+    # --------------------------------------------------
+    # CUSTOMER DETAILS
+    # --------------------------------------------------
+
+    customer = customers[
+        customers["consumer_id"] == selected_customer
+    ].iloc[0]
+
+
+    # --------------------------------------------------
+    # CUSTOMER INFORMATION CARDS
+    # --------------------------------------------------
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    col1.metric(
+        "Consumer ID",
+        customer["consumer_id"]
+    )
+
+    col2.metric(
+        "Category",
+        customer["category"]
+    )
+
+    col3.metric(
+        "Zone",
+        customer["zone"]
+    )
+
+    col4.metric(
+        "Area",
+        customer["area"]
+    )
+
+    col5.metric(
+        "Sanctioned Load",
+        f'{customer["sanctioned_load_kw"]} kW'
+    )
+
+
+    # --------------------------------------------------
+    # CUSTOMER BILLING DATA
+    # --------------------------------------------------
+
+    customer_billing = billing[
+        billing["consumer_id"] == selected_customer
+    ].copy()
+
+    customer_billing = customer_billing.sort_values(
+        "billing_month"
+    )
+
+
+    # --------------------------------------------------
+    # MONTHLY CONSUMPTION
+    # --------------------------------------------------
+
+    st.subheader(
+        "📈 Monthly Electricity Consumption"
+    )
+
+    monthly_consumption = (
+        customer_billing
+        .set_index("billing_month")[
+            "units_consumed"
+        ]
+    )
+
+    st.line_chart(
+        monthly_consumption
+    )
+
+
+    # --------------------------------------------------
+    # BILLING HISTORY
+    # --------------------------------------------------
+
+    st.subheader(
+        "📋 Customer Billing History"
+    )
+
+    billing_history = customer_billing[
+        [
+            "billing_month",
+            "units_consumed",
+            "amount_billed",
+            "payment_status",
+            "due_date",
+            "payment_date",
+            "consumption_pattern"
+        ]
+    ].copy()
+
+    st.dataframe(
+        billing_history,
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+    # --------------------------------------------------
+    # CUSTOMER REVENUE AT RISK
+    # --------------------------------------------------
+
+    customer_revenue_at_risk = customer_billing.loc[
+        customer_billing["payment_status"] == "Unpaid",
+        "amount_billed"
+    ].sum()
+
+
+    st.subheader(
+        "💰 Customer Revenue at Risk"
+    )
+
+    st.metric(
+        "Unpaid Amount",
+        f"₹{customer_revenue_at_risk:,.2f}"
+    )
