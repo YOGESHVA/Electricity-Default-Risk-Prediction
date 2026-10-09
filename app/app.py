@@ -27,8 +27,6 @@ st.markdown("""
 }
 .main .block-container {
     padding-top: 1.5rem;
-    padding-left: 2rem;
-    padding-right: 2rem;
     padding-bottom: 3rem;
     max-width: 100%;
 }
@@ -43,7 +41,7 @@ div[data-testid="stMetric"] {
     background-color: #0d1d31;
     border: 1px solid #214363;
     border-radius: 14px;
-    padding: 18px;
+    padding: 16px;
 }
 div[data-testid="stMetricLabel"] {
     color: #8ea6be !important;
@@ -58,10 +56,6 @@ div[data-testid="stMetricValue"] {
     border: 1px solid #2b5a82;
     border-radius: 8px;
 }
-.stButton button:hover {
-    background-color: #17476f;
-    color: white;
-}
 hr {
     border-color: #203b5a;
 }
@@ -70,7 +64,7 @@ hr {
 
 # ============================================================
 # 3. PROJECT PATHS
-# app.py is in app/ and CSV files are in data/
+# app.py is in app/; CSV files are in data/
 # ============================================================
 
 APP_DIR = Path(__file__).resolve().parent
@@ -78,7 +72,7 @@ PROJECT_DIR = APP_DIR.parent
 DATA_DIR = PROJECT_DIR / "data"
 
 # ============================================================
-# 4. COLUMN CLEANING
+# 4. CLEAN COLUMN NAMES
 # ============================================================
 
 def clean_columns(df):
@@ -90,40 +84,36 @@ def clean_columns(df):
         .lower()
         for column in df.columns
     ]
-
     return df
-
 
 # ============================================================
 # 5. SMART CSV READER
-# Automatically detects comma or tab separators
+# Detect comma/tab separators and tolerate malformed records
 # ============================================================
 
 def read_smart_csv(file_path):
     file_path = Path(file_path)
 
     if not file_path.exists():
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"CSV file not found: {file_path}")
 
     df = pd.read_csv(
         file_path,
         encoding="utf-8-sig",
         sep=None,
-        engine="python"
+        engine="python",
+        on_bad_lines="warn"
     )
 
     return clean_columns(df)
 
-
 # ============================================================
-# 6. COLLECTION ACTIONS CSV READER
-# Supports comma/tab separators and 8/9-column files
+# 6. COLLECTION ACTIONS READER
 # ============================================================
 
 def read_collection_actions_csv(file_path):
     df = read_smart_csv(file_path)
 
-    # Standard expected column names
     expected_columns = [
         "action_id",
         "consumer_id",
@@ -136,37 +126,19 @@ def read_collection_actions_csv(file_path):
         "notes"
     ]
 
-    # If the file has eight columns, add amount_recovered
-    # as a blank column. This supports older files.
-    if len(df.columns) == 8:
-        columns = list(df.columns)
-
-        if "amount_recovered" not in columns:
-            if "officer_id" in columns:
-                insert_position = columns.index("officer_id")
-            else:
-                insert_position = 6
-
-            df.insert(insert_position, "amount_recovered", 0)
-
-    # Do not silently reinterpret files with unexpected columns
-    if len(df.columns) != 9:
-        raise ValueError(
-            "collection_actions.csv should contain 8 or 9 columns. "
-            f"Found {len(df.columns)} columns: {df.columns.tolist()}"
-        )
-
-    # Make sure the recovered amount column exists
+    # Handle an older file that has no amount_recovered column.
     if "amount_recovered" not in df.columns:
         df["amount_recovered"] = 0
 
-    # Add any missing optional columns
+    # Add any missing columns with defaults.
     for column in expected_columns:
         if column not in df.columns:
-            df[column] = ""
+            if column in ["amount_targeted", "amount_recovered"]:
+                df[column] = 0
+            else:
+                df[column] = ""
 
-    return df
-
+    return df[expected_columns]
 
 # ============================================================
 # 7. LOAD ALL DATA
@@ -174,14 +146,8 @@ def read_collection_actions_csv(file_path):
 
 @st.cache_data
 def load_data():
-
-    customers = read_smart_csv(
-        DATA_DIR / "customers.csv"
-    )
-
-    billing = read_smart_csv(
-        DATA_DIR / "billing_records.csv"
-    )
+    customers = read_smart_csv(DATA_DIR / "customers.csv")
+    billing = read_smart_csv(DATA_DIR / "billing_records.csv")
 
     collection_actions = read_collection_actions_csv(
         DATA_DIR / "collection_actions.csv"
@@ -203,7 +169,6 @@ def load_data():
         risk_predictions
     )
 
-
 # ============================================================
 # 8. LOAD DATA SAFELY
 # ============================================================
@@ -219,7 +184,8 @@ try:
 
 except Exception as error:
     st.error("Unable to load the project data.")
-    st.write("Check that all five files exist in the data folder:")
+    st.write("Required files inside the data folder:")
+
     st.code(
         "data/customers.csv\n"
         "data/billing_records.csv\n"
@@ -227,12 +193,12 @@ except Exception as error:
         "data/anomaly_detection_results.csv\n"
         "data/default_risk_predictions.csv"
     )
+
     st.exception(error)
     st.stop()
 
-
 # ============================================================
-# 9. REQUIRED COLUMN VALIDATION
+# 9. VALIDATE REQUIRED COLUMNS
 # ============================================================
 
 required_columns = {
@@ -262,34 +228,25 @@ required_columns = {
 
 column_errors = []
 
-for file_name, (dataframe, expected_columns) in required_columns.items():
-
-    missing = [
-        column for column in expected_columns
-        if column not in dataframe.columns
-    ]
+for file_name, (df, expected) in required_columns.items():
+    missing = [column for column in expected if column not in df.columns]
 
     if missing:
         column_errors.append(
             f"{file_name}: missing {missing}. "
-            f"Actual columns: {dataframe.columns.tolist()}"
+            f"Columns found: {df.columns.tolist()}"
         )
 
 if column_errors:
     st.error("Some CSV files have unexpected column names.")
 
-    for error_message in column_errors:
-        st.write(error_message)
+    for message in column_errors:
+        st.write(message)
 
-    st.info(
-        "Check the header row of each CSV file. "
-        "The app now detects comma and tab separators automatically."
-    )
     st.stop()
 
-
 # ============================================================
-# 10. DATA CLEANING AND TYPE CONVERSION
+# 10. DATA TYPE CLEANING
 # ============================================================
 
 if "sanctioned_load_kw" not in customers.columns:
@@ -333,24 +290,20 @@ risk_predictions["risk_score"] = pd.to_numeric(
 ).fillna(0)
 
 for column in ["amount_targeted", "amount_recovered"]:
-    if column in collection_actions.columns:
-        collection_actions[column] = pd.to_numeric(
-            collection_actions[column],
-            errors="coerce"
-        ).fillna(0)
+    collection_actions[column] = pd.to_numeric(
+        collection_actions[column],
+        errors="coerce"
+    ).fillna(0)
 
-if "action_outcome" in collection_actions.columns:
-    collection_actions["action_outcome"] = (
-        collection_actions["action_outcome"]
-        .astype(str)
-        .str.strip()
-        .str.title()
-    )
-
+collection_actions["action_outcome"] = (
+    collection_actions["action_outcome"]
+    .astype(str)
+    .str.strip()
+    .str.title()
+)
 
 # ============================================================
-# 11. LOGIN SYSTEM
-# Demo credentials only; do not use these for real customer data
+# 11. DEMO LOGIN
 # ============================================================
 
 USERS = {
@@ -368,40 +321,23 @@ USERS = {
     }
 }
 
-
 def show_login():
     st.title("⚡ Electricity Command Center")
-    st.caption(
-        "Electricity Consumption, Billing & Default Risk Analytics"
-    )
+    st.caption("Electricity Consumption, Billing & Default Risk Analytics")
     st.divider()
     st.subheader("🔐 Login")
 
-    username = st.text_input(
-        "Username",
-        placeholder="Enter username"
-    )
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
 
-    password = st.text_input(
-        "Password",
-        type="password",
-        placeholder="Enter password"
-    )
-
-    if st.button("🔐 Login", use_container_width=True):
-
-        if username not in USERS:
-            st.error("Username not found.")
-
-        elif USERS[username]["password"] != password:
-            st.error("Incorrect password.")
-
-        else:
+    if st.button("Login", use_container_width=True):
+        if username in USERS and USERS[username]["password"] == password:
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
             st.session_state["role"] = USERS[username]["role"]
             st.rerun()
-
+        else:
+            st.error("Incorrect username or password.")
 
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -412,7 +348,6 @@ if not st.session_state["logged_in"]:
 
 current_username = st.session_state.get("username", "")
 current_role = st.session_state.get("role", "")
-
 
 # ============================================================
 # 12. ROLE-BASED NAVIGATION
@@ -425,23 +360,17 @@ if current_role == "Admin":
         "🚨 Collection & Anomaly",
         "🤖 Risk Prediction"
     ]
-
 elif current_role == "Collection Officer":
     available_pages = [
         "📊 Risk Intelligence",
         "🔎 Customer Investigation",
         "🚨 Collection & Anomaly"
     ]
-
-elif current_role == "Field Staff":
+else:
     available_pages = [
         "🔎 Customer Investigation",
         "🚨 Collection & Anomaly"
     ]
-
-else:
-    available_pages = ["📊 Risk Intelligence"]
-
 
 # ============================================================
 # 13. SIDEBAR
@@ -450,88 +379,65 @@ else:
 with st.sidebar:
     st.title("⚡ Command Center")
     st.caption("DATA DETECTIVES")
-
     st.write(f"**User:** {current_username}")
     st.write(f"**Role:** {current_role}")
     st.divider()
-    st.write("### Navigation")
 
-    page = st.radio(
-        "Select Page",
-        available_pages,
-        label_visibility="collapsed"
-    )
-
-    st.divider()
-    st.caption("Predict → Detect → Investigate → Act → Measure")
+    page = st.radio("Navigation", available_pages)
 
     if st.button("🚪 Logout", use_container_width=True):
         for key in ["logged_in", "username", "role"]:
             st.session_state.pop(key, None)
         st.rerun()
 
-
 st.title("⚡ ELECTRICITY COMMAND CENTER")
 st.caption("Electricity Consumption, Billing & Default Risk Analytics")
-st.info("Predict → Detect → Investigate → Act → Measure")
 st.divider()
-
 
 # ============================================================
 # PAGE 1: RISK INTELLIGENCE
 # ============================================================
 
 def show_risk_intelligence():
-
-    st.header("📊 Electricity Risk Intelligence")
-    st.caption(
-        "Monitor consumption, billing, payment behavior and revenue risk."
-    )
+    st.header("📊 Risk Intelligence")
 
     total_customers = customers["consumer_id"].nunique()
     total_consumption = billing["units_consumed"].sum()
     total_billing = billing["amount_billed"].sum()
 
-    unpaid_data = billing[
+    unpaid = billing[
         billing["payment_status"].str.lower() == "unpaid"
     ].copy()
 
-    unpaid_customers = unpaid_data["consumer_id"].nunique()
-    revenue_at_risk = unpaid_data["amount_billed"].sum()
+    unpaid_customers = unpaid["consumer_id"].nunique()
+    revenue_at_risk = unpaid["amount_billed"].sum()
 
-    st.subheader("📌 Key Performance Indicators")
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Total Customers", f"{total_customers:,}")
+    c2.metric("Total Consumption", f"{total_consumption:,.0f}")
+    c3.metric("Total Billing", f"₹{total_billing:,.0f}")
+    c4.metric("Unpaid Customers", f"{unpaid_customers:,}")
+    c5.metric("Revenue at Risk", f"₹{revenue_at_risk:,.0f}")
 
-    col1, col2, col3, col4, col5 = st.columns(5)
+    st.subheader("Dashboard Filters")
+    f1, f2, f3 = st.columns(3)
 
-    col1.metric("👥 Total Customers", f"{total_customers:,}")
-    col2.metric("⚡ Total Consumption", f"{total_consumption:,.0f}")
-    col3.metric("💰 Total Billing", f"₹{total_billing:,.0f}")
-    col4.metric("⚠️ Unpaid Customers", f"{unpaid_customers:,}")
-    col5.metric("🚨 Revenue at Risk", f"₹{revenue_at_risk:,.0f}")
-
-    st.subheader("🔎 Dashboard Filters")
-
-    filter_col1, filter_col2, filter_col3 = st.columns(3)
-
-    with filter_col1:
+    with f1:
         zones = ["All"] + sorted(
             customers["zone"].dropna().astype(str).unique().tolist()
         )
         selected_zone = st.selectbox("Zone", zones)
 
-    with filter_col2:
+    with f2:
         categories = ["All"] + sorted(
             customers["category"].dropna().astype(str).unique().tolist()
         )
         selected_category = st.selectbox("Category", categories)
 
-    with filter_col3:
+    with f3:
         months = ["All"] + sorted(
-            billing["billing_month"]
-            .dropna()
-            .dt.strftime("%Y-%m")
-            .unique()
-            .tolist()
+            billing["billing_month"].dropna()
+            .dt.strftime("%Y-%m").unique().tolist()
         )
         selected_month = st.selectbox("Billing Month", months)
 
@@ -544,8 +450,7 @@ def show_risk_intelligence():
 
     if selected_category != "All":
         filtered_customers = filtered_customers[
-            filtered_customers["category"].astype(str)
-            == selected_category
+            filtered_customers["category"].astype(str) == selected_category
         ]
 
     filtered_billing = billing.merge(
@@ -560,113 +465,78 @@ def show_risk_intelligence():
             == selected_month
         ]
 
-    st.divider()
-    st.subheader("📈 Monthly Electricity Consumption")
-
+    st.subheader("Monthly Electricity Consumption")
     monthly_consumption = (
-        filtered_billing
-        .groupby("billing_month")["units_consumed"]
-        .sum()
-        .sort_index()
+        filtered_billing.groupby("billing_month")["units_consumed"]
+        .sum().sort_index()
     )
-
     if not monthly_consumption.empty:
         st.line_chart(monthly_consumption)
     else:
         st.info("No consumption data for these filters.")
 
-    st.subheader("💰 Monthly Billing")
-
+    st.subheader("Monthly Billing")
     monthly_billing = (
-        filtered_billing
-        .groupby("billing_month")["amount_billed"]
-        .sum()
-        .sort_index()
+        filtered_billing.groupby("billing_month")["amount_billed"]
+        .sum().sort_index()
     )
-
     if not monthly_billing.empty:
         st.line_chart(monthly_billing)
     else:
         st.info("No billing data for these filters.")
 
-    col1, col2 = st.columns(2)
+    c1, c2 = st.columns(2)
 
-    with col1:
-        st.subheader("💳 Payment Status")
-
+    with c1:
+        st.subheader("Payment Status")
         if not filtered_billing.empty:
-            st.bar_chart(
-                filtered_billing["payment_status"].value_counts()
-            )
+            st.bar_chart(filtered_billing["payment_status"].value_counts())
         else:
-            st.info("No payment data available.")
+            st.info("No payment data.")
 
-    with col2:
-        st.subheader("⚡ Consumption Pattern")
-
+    with c2:
+        st.subheader("Consumption Pattern")
         if "consumption_pattern" in filtered_billing.columns:
             st.bar_chart(
-                filtered_billing["consumption_pattern"]
-                .astype(str)
-                .str.strip()
-                .value_counts()
+                filtered_billing["consumption_pattern"].value_counts()
             )
         else:
-            st.info("No consumption pattern column found.")
+            st.info("No consumption pattern column.")
 
-    st.subheader("🚨 Revenue at Risk by Zone")
-
+    st.subheader("Revenue at Risk by Zone")
     filtered_unpaid = filtered_billing[
         filtered_billing["payment_status"].str.lower() == "unpaid"
     ]
 
     if not filtered_unpaid.empty:
-
-        revenue_zone = filtered_unpaid.merge(
+        zone_data = filtered_unpaid.merge(
             customers[["consumer_id", "zone"]].drop_duplicates(),
             on="consumer_id",
             how="left"
         )
-
-        revenue_zone = (
-            revenue_zone.groupby("zone")["amount_billed"]
-            .sum()
-            .sort_values(ascending=False)
+        st.bar_chart(
+            zone_data.groupby("zone")["amount_billed"]
+            .sum().sort_values(ascending=False)
         )
-
-        st.bar_chart(revenue_zone)
-
     else:
-        st.info("No unpaid bills found for these filters.")
-
+        st.info("No unpaid bills for these filters.")
 
 # ============================================================
 # PAGE 2: CUSTOMER INVESTIGATION
 # ============================================================
 
 def show_customer_investigation():
-
     st.header("🔎 Customer Investigation")
-    st.caption(
-        "Customer 360° — Consumption • Billing • Payment • Anomalies"
-    )
 
     customer_list = sorted(
-        customers["consumer_id"]
-        .dropna()
-        .astype(str)
-        .unique()
-        .tolist()
+        customers["consumer_id"].dropna().astype(str).unique().tolist()
     )
 
     if not customer_list:
-        st.warning("No customer IDs were found.")
+        st.warning("No customer IDs found.")
         return
 
-    selected_customer = st.selectbox(
-        "🔎 Select Consumer ID",
-        customer_list
-    )
+    selected_customer = st.selectbox("Select Consumer ID", customer_list)
 
     customer_data = customers[
         customers["consumer_id"].astype(str) == selected_customer
@@ -678,186 +548,89 @@ def show_customer_investigation():
 
     customer = customer_data.iloc[0]
 
-    st.subheader("👤 Customer Information")
-
-    col1, col2, col3, col4, col5 = st.columns(5)
-
-    col1.metric("Consumer ID", str(customer["consumer_id"]))
-    col2.metric("Category", str(customer.get("category", "N/A")))
-    col3.metric("Zone", str(customer.get("zone", "N/A")))
-    col4.metric("Area", str(customer.get("area", "N/A")))
-    col5.metric(
-        "Sanctioned Load",
-        f'{customer.get("sanctioned_load_kw", 0)} kW'
-    )
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Consumer ID", str(customer["consumer_id"]))
+    c2.metric("Category", str(customer.get("category", "N/A")))
+    c3.metric("Zone", str(customer.get("zone", "N/A")))
+    c4.metric("Area", str(customer.get("area", "N/A")))
+    c5.metric("Sanctioned Load", f'{customer.get("sanctioned_load_kw", 0)} kW')
 
     customer_billing = billing[
         billing["consumer_id"].astype(str) == selected_customer
-    ].copy()
+    ].copy().sort_values("billing_month")
 
-    customer_billing = customer_billing.sort_values("billing_month")
+    st.subheader("Billing History")
 
     if customer_billing.empty:
-        st.warning("No billing records found for this customer.")
+        st.info("No billing records found.")
     else:
-        total_units = customer_billing["units_consumed"].sum()
-        total_amount = customer_billing["amount_billed"].sum()
-
-        unpaid_billing = customer_billing[
+        unpaid = customer_billing[
             customer_billing["payment_status"].str.lower() == "unpaid"
         ]
 
-        unpaid_count = len(unpaid_billing)
-        unpaid_amount = unpaid_billing["amount_billed"].sum()
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Total Consumption", f'{customer_billing["units_consumed"].sum():,.0f}')
+        c2.metric("Total Billing", f'₹{customer_billing["amount_billed"].sum():,.0f}')
+        c3.metric("Unpaid Bills", len(unpaid))
+        c4.metric("Revenue at Risk", f'₹{unpaid["amount_billed"].sum():,.0f}')
 
-        st.subheader("📌 Customer Summary")
-
-        col1, col2, col3, col4 = st.columns(4)
-
-        col1.metric("⚡ Total Consumption", f"{total_units:,.0f}")
-        col2.metric("💰 Total Billing", f"₹{total_amount:,.0f}")
-        col3.metric("⚠️ Unpaid Bills", f"{unpaid_count:,}")
-        col4.metric("🚨 Revenue at Risk", f"₹{unpaid_amount:,.0f}")
-
-        st.subheader("📈 Monthly Electricity Consumption")
-
-        monthly = (
-            customer_billing
-            .groupby("billing_month")["units_consumed"]
-            .sum()
-            .sort_index()
+        st.subheader("Monthly Consumption")
+        st.line_chart(
+            customer_billing.groupby("billing_month")["units_consumed"]
+            .sum().sort_index()
         )
 
-        st.line_chart(monthly)
-
-        st.subheader("📋 Customer Billing History")
-
-        billing_columns = [
-            "billing_month",
-            "units_consumed",
-            "amount_billed",
-            "payment_status",
-            "due_date",
-            "payment_date",
-            "consumption_pattern"
+        display_columns = [
+            "billing_month", "units_consumed", "amount_billed",
+            "payment_status", "due_date", "payment_date"
         ]
-
-        billing_columns = [
-            column for column in billing_columns
-            if column in customer_billing.columns
+        display_columns = [
+            col for col in display_columns
+            if col in customer_billing.columns
         ]
-
         st.dataframe(
-            customer_billing[billing_columns],
+            customer_billing[display_columns],
             use_container_width=True,
             hide_index=True
         )
 
-    st.subheader("⚠️ Customer Anomalies")
-
+    st.subheader("Customer Anomalies")
     customer_anomalies = anomalies[
         anomalies["consumer_id"].astype(str).str.strip().str.upper()
         == selected_customer.strip().upper()
-    ].copy()
+    ]
 
     if customer_anomalies.empty:
-        st.success("No anomaly records found for this customer.")
+        st.success("No anomaly records found.")
     else:
-        anomaly_columns = [
-            "consumer_id",
-            "billing_month",
-            "units_consumed",
-            "previous_units",
-            "consumption_change_pct",
-            "anomaly_type",
-            "amount_billed",
-            "payment_status"
-        ]
+        st.dataframe(customer_anomalies, use_container_width=True, hide_index=True)
 
-        anomaly_columns = [
-            column for column in anomaly_columns
-            if column in customer_anomalies.columns
-        ]
-
-        st.dataframe(
-            customer_anomalies[anomaly_columns],
-            use_container_width=True,
-            hide_index=True
-        )
-
-    # Collection action entry form
+    # Record a collection action
     st.divider()
-    st.subheader("📞 Record Collection Action")
+    st.subheader("Record Collection Action")
 
     with st.form("collection_action_form"):
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            action_type = st.selectbox(
-                "Action Type",
-                [
-                    "Phone Call",
-                    "SMS",
-                    "Payment Reminder",
-                    "Notice",
-                    "Field Visit"
-                ]
-            )
-
-            action_outcome = st.selectbox(
-                "Action Outcome",
-                [
-                    "Pending",
-                    "Contacted",
-                    "Promised Payment",
-                    "Recovered",
-                    "No Response"
-                ]
-            )
-
-            amount_targeted = st.number_input(
-                "Amount Targeted (₹)",
-                min_value=0.0,
-                value=0.0,
-                step=100.0
-            )
-
-            amount_recovered = st.number_input(
-                "Amount Recovered (₹)",
-                min_value=0.0,
-                value=0.0,
-                step=100.0
-            )
-
-        with col2:
-            officer_id = st.text_input(
-                "Officer ID",
-                placeholder="Example: OFF001"
-            )
-
-            notes = st.text_area(
-                "Notes",
-                placeholder="Enter collection action details"
-            )
-
-        submit_action = st.form_submit_button(
-            "📞 Record Collection Action"
+        action_type = st.selectbox(
+            "Action Type",
+            ["Phone Call", "SMS", "Payment Reminder", "Notice", "Field Visit"]
         )
+        action_outcome = st.selectbox(
+            "Action Outcome",
+            ["Pending", "Contacted", "Promised Payment", "Recovered", "No Response"]
+        )
+        amount_targeted = st.number_input("Amount Targeted (₹)", min_value=0.0)
+        amount_recovered = st.number_input("Amount Recovered (₹)", min_value=0.0)
+        officer_id = st.text_input("Officer ID")
+        notes = st.text_area("Notes")
 
-        if submit_action:
+        submitted = st.form_submit_button("Save Action")
 
+        if submitted:
             if not officer_id.strip():
-                st.warning("Please enter the Officer ID.")
-
+                st.warning("Enter an Officer ID.")
             else:
-                action_file = DATA_DIR / "collection_actions.csv"
-
                 new_action = {
-                    "action_id": (
-                        "ACTION_"
-                        + datetime.now().strftime("%Y%m%d%H%M%S%f")
-                    ),
+                    "action_id": "ACTION_" + datetime.now().strftime("%Y%m%d%H%M%S%f"),
                     "consumer_id": selected_customer,
                     "action_date": datetime.now().strftime("%Y-%m-%d"),
                     "action_type": action_type,
@@ -869,333 +642,165 @@ def show_customer_investigation():
                 }
 
                 try:
-                    existing_actions = read_collection_actions_csv(
-                        action_file
-                    )
-
-                    updated_actions = pd.concat(
-                        [
-                            existing_actions,
-                            pd.DataFrame([new_action])
-                        ],
+                    updated = pd.concat(
+                        [collection_actions, pd.DataFrame([new_action])],
                         ignore_index=True
                     )
-
-                    updated_actions.to_csv(
-                        action_file,
-                        index=False
-                    )
-
+                    updated.to_csv(DATA_DIR / "collection_actions.csv", index=False)
                     st.cache_data.clear()
-
-                    st.success("Collection action recorded.")
+                    st.success("Collection action saved.")
                     st.warning(
-                        "Streamlit Cloud may not retain CSV changes "
-                        "after a restart or redeployment. Use a database "
-                        "for permanent storage."
+                        "Streamlit Cloud may not preserve CSV changes "
+                        "after restart or redeployment."
                     )
-
                 except Exception as error:
-                    st.error(
-                        f"Could not save the collection action: {error}"
-                    )
+                    st.error(f"Could not save the action: {error}")
 
-    st.divider()
-    st.subheader("📋 Collection Action History")
-
+    st.subheader("Collection Action History")
     customer_actions = collection_actions[
         collection_actions["consumer_id"].astype(str).str.strip()
         == selected_customer.strip()
-    ].copy()
+    ]
 
     if customer_actions.empty:
-        st.info("No previous collection actions found.")
+        st.info("No collection actions found.")
     else:
-        history_columns = [
-            "action_date",
-            "action_type",
-            "action_outcome",
-            "amount_targeted",
-            "amount_recovered",
-            "officer_id",
-            "notes"
-        ]
-
-        history_columns = [
-            column for column in history_columns
-            if column in customer_actions.columns
-        ]
-
-        if "action_date" in customer_actions.columns:
-            customer_actions = customer_actions.sort_values(
-                "action_date",
-                ascending=False
-            )
-
-        st.dataframe(
-            customer_actions[history_columns],
-            use_container_width=True,
-            hide_index=True
-        )
-
+        st.dataframe(customer_actions, use_container_width=True, hide_index=True)
 
 # ============================================================
 # PAGE 3: COLLECTION & ANOMALY
 # ============================================================
 
 def show_collection_anomaly():
-
     st.header("🚨 Collection & Anomaly Intelligence")
-    st.caption("Act → Recover → Detect")
 
-    unpaid_data = billing[
+    unpaid = billing[
         billing["payment_status"].str.lower() == "unpaid"
     ].copy()
 
-    unpaid_customers = unpaid_data["consumer_id"].nunique()
-    revenue_at_risk = unpaid_data["amount_billed"].sum()
-    anomaly_count = len(anomalies)
-    action_count = len(collection_actions)
+    targeted = collection_actions["amount_targeted"].sum()
+    recovered = collection_actions["amount_recovered"].sum()
+    recovery_rate = recovered / targeted * 100 if targeted else 0
 
-    recovered_actions = 0
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Unpaid Customers", f'{unpaid["consumer_id"].nunique():,}')
+    c2.metric("Revenue at Risk", f'₹{unpaid["amount_billed"].sum():,.0f}')
+    c3.metric("Anomaly Cases", f"{len(anomalies):,}")
+    c4.metric("Collection Actions", f"{len(collection_actions):,}")
+    c5.metric("Recovered Actions", int(
+        (collection_actions["action_outcome"].str.lower() == "recovered").sum()
+    ))
 
-    if "action_outcome" in collection_actions.columns:
-        recovered_actions = (
-            collection_actions["action_outcome"].str.lower()
-            == "recovered"
-        ).sum()
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Amount Targeted", f"₹{targeted:,.0f}")
+    c2.metric("Amount Recovered", f"₹{recovered:,.0f}")
+    c3.metric("Recovery Rate", f"{recovery_rate:.2f}%")
 
-    total_targeted = collection_actions[
-        "amount_targeted"
-    ].sum()
+    c1, c2 = st.columns(2)
 
-    total_recovered = collection_actions[
-        "amount_recovered"
-    ].sum()
-
-    recovery_rate = (
-        total_recovered / total_targeted * 100
-        if total_targeted > 0
-        else 0
-    )
-
-    col1, col2, col3, col4, col5 = st.columns(5)
-
-    col1.metric("⚠️ Unpaid Customers", f"{unpaid_customers:,}")
-    col2.metric("💰 Revenue at Risk", f"₹{revenue_at_risk:,.0f}")
-    col3.metric("🚨 Anomaly Cases", f"{anomaly_count:,}")
-    col4.metric("📞 Collection Actions", f"{action_count:,}")
-    col5.metric("✅ Recovered Actions", f"{recovered_actions:,}")
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric("🎯 Amount Targeted", f"₹{total_targeted:,.0f}")
-    col2.metric("💵 Amount Recovered", f"₹{total_recovered:,.0f}")
-    col3.metric("📈 Recovery Rate", f"{recovery_rate:.2f}%")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("📍 Unpaid Customers by Zone")
-
-        if not unpaid_data.empty:
-            unpaid_zone = unpaid_data.merge(
+    with c1:
+        st.subheader("Unpaid Customers by Zone")
+        if not unpaid.empty:
+            zone_data = unpaid.merge(
                 customers[["consumer_id", "zone"]].drop_duplicates(),
-                on="consumer_id",
-                how="left"
+                on="consumer_id", how="left"
             )
-
-            unpaid_zone = (
-                unpaid_zone.groupby("zone")["consumer_id"]
-                .nunique()
-                .sort_values(ascending=False)
+            st.bar_chart(
+                zone_data.groupby("zone")["consumer_id"]
+                .nunique().sort_values(ascending=False)
             )
-
-            st.bar_chart(unpaid_zone)
         else:
             st.info("No unpaid bills found.")
 
-    with col2:
-        st.subheader("📞 Collection Outcome")
+    with c2:
+        st.subheader("Collection Outcomes")
+        st.bar_chart(collection_actions["action_outcome"].value_counts())
 
-        st.bar_chart(
-            collection_actions["action_outcome"].value_counts()
-        )
+    c1, c2 = st.columns(2)
 
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("⚠️ Anomaly Type")
-
+    with c1:
+        st.subheader("Anomaly Types")
         if "anomaly_type" in anomalies.columns:
             st.bar_chart(anomalies["anomaly_type"].value_counts())
         else:
-            st.info("No anomaly type data.")
+            st.info("No anomaly type column.")
 
-    with col2:
-        st.subheader("📍 Anomaly Cases by Zone")
-
-        anomaly_zone = anomalies.merge(
+    with c2:
+        st.subheader("Anomaly Cases by Zone")
+        zone_data = anomalies.merge(
             customers[["consumer_id", "zone"]].drop_duplicates(),
-            on="consumer_id",
-            how="left"
+            on="consumer_id", how="left"
         )
+        st.bar_chart(zone_data.groupby("zone")["consumer_id"].count())
 
-        anomaly_zone = (
-            anomaly_zone.groupby("zone")["consumer_id"]
-            .count()
-            .sort_values(ascending=False)
-        )
-
-        st.bar_chart(anomaly_zone)
-
-    st.subheader("⚠️ Recent Anomaly Records")
-
-    anomaly_columns = [
-        "consumer_id",
-        "billing_month",
-        "units_consumed",
-        "previous_units",
-        "consumption_change_pct",
-        "anomaly_type",
-        "amount_billed",
-        "payment_status"
-    ]
-
-    anomaly_columns = [
-        column for column in anomaly_columns
-        if column in anomalies.columns
-    ]
-
-    st.dataframe(
-        anomalies[anomaly_columns].head(100),
-        use_container_width=True,
-        hide_index=True
-    )
-
+    st.subheader("Recent Anomaly Records")
+    st.dataframe(anomalies.head(100), use_container_width=True, hide_index=True)
 
 # ============================================================
 # PAGE 4: RISK PREDICTION
 # ============================================================
 
 def show_risk_prediction():
-
     st.header("🤖 Risk Prediction & Model Performance")
-    st.caption("Predict → Explain → Prioritize")
 
-    risk_scored_customers = risk_predictions["consumer_id"].nunique()
-
-    high_risk_data = risk_predictions[
+    high_risk = risk_predictions[
         risk_predictions["risk_level"] == "HIGH"
     ].copy()
 
-    high_risk_customers = high_risk_data["consumer_id"].nunique()
-    average_risk_score = risk_predictions["risk_score"].mean()
+    low_count = (risk_predictions["risk_level"] == "LOW").sum()
+    medium_count = (risk_predictions["risk_level"] == "MEDIUM").sum()
 
-    low_risk = (
-        risk_predictions["risk_level"] == "LOW"
-    ).sum()
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Risk-Scored Customers", f'{risk_predictions["consumer_id"].nunique():,}')
+    c2.metric("High-Risk Customers", f'{high_risk["consumer_id"].nunique():,}')
+    c3.metric("Average Risk Score", f'{risk_predictions["risk_score"].mean():.2f}')
+    c4.metric("Low-Risk Records", int(low_count))
+    c5.metric("Medium-Risk Records", int(medium_count))
 
-    medium_risk = (
-        risk_predictions["risk_level"] == "MEDIUM"
-    ).sum()
+    c1, c2 = st.columns(2)
 
-    col1, col2, col3, col4, col5 = st.columns(5)
+    with c1:
+        st.subheader("Risk Level Distribution")
+        st.bar_chart(risk_predictions["risk_level"].value_counts())
 
-    col1.metric("🎯 Risk Scored", f"{risk_scored_customers:,}")
-    col2.metric("🔴 High Risk", f"{high_risk_customers:,}")
-    col3.metric("📊 Average Risk", f"{average_risk_score:.2f}")
-    col4.metric("🟢 Low Risk", f"{low_risk:,}")
-    col5.metric("🟠 Medium Risk", f"{medium_risk:,}")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("🎯 Risk Level Distribution")
-
-        st.bar_chart(
-            risk_predictions["risk_level"].value_counts()
-        )
-
-    with col2:
-        st.subheader("📍 High-Risk Customers by Zone")
-
-        high_risk_zone = high_risk_data.merge(
+    with c2:
+        st.subheader("High-Risk Customers by Zone")
+        high_zone = high_risk.merge(
             customers[["consumer_id", "zone"]].drop_duplicates(),
-            on="consumer_id",
-            how="left"
+            on="consumer_id", how="left"
+        )
+        st.bar_chart(
+            high_zone.groupby("zone")["consumer_id"]
+            .nunique().sort_values(ascending=False)
         )
 
-        high_risk_zone = (
-            high_risk_zone.groupby("zone")["consumer_id"]
-            .nunique()
-            .sort_values(ascending=False)
-        )
-
-        st.bar_chart(high_risk_zone)
-
-    st.subheader("📊 Average Risk Score by Zone")
-
+    st.subheader("Average Risk Score by Zone")
     risk_zone = risk_predictions.merge(
         customers[["consumer_id", "zone"]].drop_duplicates(),
-        on="consumer_id",
-        how="left"
+        on="consumer_id", how="left"
     )
-
-    risk_zone = (
+    st.bar_chart(
         risk_zone.groupby("zone")["risk_score"]
-        .mean()
-        .sort_values(ascending=False)
+        .mean().sort_values(ascending=False)
     )
 
-    st.bar_chart(risk_zone)
-
-    st.subheader("📈 Risk Score Distribution")
+    st.subheader("Risk Score Distribution")
     st.line_chart(risk_predictions[["risk_score"]])
 
-    st.subheader("🧠 Model Information")
-
-    model_col1, model_col2, model_col3 = st.columns(3)
-
-    model_col1.metric("Model", "Logistic Regression")
-    model_col2.metric("Accuracy", "71.65%")
-    model_col3.metric("Risk Score Range", "0–100")
+    st.subheader("Model Information")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Model", "Logistic Regression")
+    c2.metric("Accuracy", "71.65%")
+    c3.metric("Risk Score Range", "0–100")
 
     st.info(
-        "The dashboard displays the risk scores supplied in "
-        "default_risk_predictions.csv. Model accuracy is a displayed "
-        "project value, not a newly calculated evaluation."
+        "The table displays risk predictions loaded from your CSV file. "
+        "The accuracy value is a project display value, not recalculated here."
     )
 
-    st.subheader("👥 Customer Risk Prioritization")
-
-    risk_columns = [
-        "consumer_id",
-        "risk_score",
-        "risk_level",
-        "prediction",
-        "average_bill",
-        "unpaid_count",
-        "late_count"
-    ]
-
-    risk_columns = [
-        column for column in risk_columns
-        if column in risk_predictions.columns
-    ]
-
-    risk_table = risk_predictions[risk_columns].copy()
-    risk_table = risk_table.sort_values(
-        "risk_score",
-        ascending=False
-    )
-
-    st.dataframe(
-        risk_table,
-        use_container_width=True,
-        hide_index=True
-    )
-
+    st.subheader("Customer Risk Prioritization")
+    risk_table = risk_predictions.sort_values("risk_score", ascending=False)
+    st.dataframe(risk_table, use_container_width=True, hide_index=True)
 
 # ============================================================
 # 14. PAGE ROUTING
