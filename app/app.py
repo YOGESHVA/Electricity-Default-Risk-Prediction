@@ -16,48 +16,207 @@ st.set_page_config(
 )
 
 # ============================================================
-# 2. CUSTOM CSS
+# 2. CUSTOM CSS - DARK THEME + TEXT COLOR FIX
 # ============================================================
 
 st.markdown("""
 <style>
+/* Main application */
 .stApp {
     background-color: #07111f;
     color: #ffffff;
 }
+
 .main .block-container {
     padding-top: 1.5rem;
     padding-bottom: 3rem;
     max-width: 100%;
 }
+
+/* Sidebar */
 section[data-testid="stSidebar"] {
     background-color: #0a1728;
     border-right: 1px solid #203b5a;
 }
-h1, h2, h3 {
+
+section[data-testid="stSidebar"] p,
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] span,
+section[data-testid="stSidebar"] div {
+    color: #ffffff;
+}
+
+/* Headings and general text */
+h1, h2, h3, h4, h5, h6,
+.stApp p,
+.stApp li,
+.stApp label,
+.stApp [data-testid="stMarkdownContainer"] {
+    color: #ffffff;
+}
+
+/* ============================================================
+   TEXT INPUTS: USERNAME, PASSWORD, OFFICER ID, ETC.
+   ============================================================ */
+
+.stTextInput input,
+.stNumberInput input,
+.stTextArea textarea,
+.stDateInput input,
+.stTimeInput input,
+div[data-baseweb="input"] input,
+div[data-baseweb="textarea"] textarea {
+    background-color: #0d1d31 !important;
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+    caret-color: #ffffff !important;
+    border-color: #294d70 !important;
+}
+
+/* Input containers */
+div[data-baseweb="input"],
+div[data-baseweb="textarea"] {
+    background-color: #0d1d31 !important;
+}
+
+/* Placeholder text */
+.stTextInput input::placeholder,
+.stNumberInput input::placeholder,
+.stTextArea textarea::placeholder,
+div[data-baseweb="input"] input::placeholder,
+div[data-baseweb="textarea"] textarea::placeholder {
+    color: #aebfd1 !important;
+    -webkit-text-fill-color: #aebfd1 !important;
+    opacity: 1 !important;
+}
+
+/* Form labels */
+.stTextInput label,
+.stNumberInput label,
+.stTextArea label,
+.stDateInput label,
+.stTimeInput label,
+.stSelectbox label,
+.stMultiSelect label,
+.stRadio label,
+.stCheckbox label,
+.stSlider label,
+.stFileUploader label {
     color: #ffffff !important;
 }
+
+/* ============================================================
+   DROPDOWNS AND SELECTBOXES
+   ============================================================ */
+
+div[data-baseweb="select"] > div {
+    background-color: #0d1d31 !important;
+    border-color: #294d70 !important;
+}
+
+div[data-baseweb="select"] span,
+div[data-baseweb="select"] input,
+div[data-baseweb="select"] div {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+}
+
+/* Dropdown option menu */
+div[role="listbox"],
+div[role="option"] {
+    background-color: #0d1d31 !important;
+    color: #ffffff !important;
+}
+
+div[role="option"]:hover {
+    background-color: #214363 !important;
+}
+
+/* Radio buttons and checkboxes */
+div[data-testid="stRadio"] label,
+div[data-testid="stCheckbox"] label {
+    color: #ffffff !important;
+}
+
+/* ============================================================
+   METRIC CARDS
+   ============================================================ */
+
 div[data-testid="stMetric"] {
     background-color: #0d1d31;
     border: 1px solid #214363;
     border-radius: 14px;
     padding: 16px;
 }
-div[data-testid="stMetricLabel"] {
-    color: #8ea6be !important;
+
+div[data-testid="stMetricLabel"],
+div[data-testid="stMetricLabel"] p {
+    color: #aebfd1 !important;
 }
-div[data-testid="stMetricValue"] {
+
+div[data-testid="stMetricValue"],
+div[data-testid="stMetricValue"] div {
     color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
     font-weight: 800 !important;
 }
-.stButton button {
-    background-color: #12365a;
-    color: white;
-    border: 1px solid #2b5a82;
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+
+.stButton button,
+.stFormSubmitButton button,
+.stDownloadButton button {
+    background-color: #12365a !important;
+    color: #ffffff !important;
+    border: 1px solid #2b5a82 !important;
     border-radius: 8px;
 }
+
+.stButton button p,
+.stFormSubmitButton button p,
+.stDownloadButton button p {
+    color: #ffffff !important;
+}
+
+.stButton button:hover,
+.stFormSubmitButton button:hover {
+    background-color: #1c4b76 !important;
+    border-color: #4b8fca !important;
+}
+
+/* ============================================================
+   TABLES
+   ============================================================ */
+
+div[data-testid="stDataFrame"],
+div[data-testid="stTable"] {
+    color: #ffffff !important;
+}
+
+/* Alerts and information boxes */
+div[data-testid="stAlert"] p {
+    color: inherit;
+}
+
+/* Disabled inputs */
+input:disabled,
+textarea:disabled {
+    color: #cbd5e1 !important;
+    -webkit-text-fill-color: #cbd5e1 !important;
+    opacity: 1 !important;
+}
+
+/* Dividers */
 hr {
     border-color: #203b5a;
+}
+
+/* Captions */
+.stCaption,
+[data-testid="stCaptionContainer"] {
+    color: #b5c5d6 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -126,11 +285,11 @@ def read_collection_actions_csv(file_path):
         "notes"
     ]
 
-    # Handle an older file that has no amount_recovered column.
+    # Handle older files without amount_recovered.
     if "amount_recovered" not in df.columns:
         df["amount_recovered"] = 0
 
-    # Add any missing columns with defaults.
+    # Add missing columns with defaults.
     for column in expected_columns:
         if column not in df.columns:
             if column in ["amount_targeted", "amount_recovered"]:
@@ -229,7 +388,10 @@ required_columns = {
 column_errors = []
 
 for file_name, (df, expected) in required_columns.items():
-    missing = [column for column in expected if column not in df.columns]
+    missing = [
+        column for column in expected
+        if column not in df.columns
+    ]
 
     if missing:
         column_errors.append(
@@ -321,23 +483,38 @@ USERS = {
     }
 }
 
+
 def show_login():
     st.title("⚡ Electricity Command Center")
-    st.caption("Electricity Consumption, Billing & Default Risk Analytics")
+    st.caption(
+        "Electricity Consumption, Billing & Default Risk Analytics"
+    )
     st.divider()
     st.subheader("🔐 Login")
 
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+    username = st.text_input(
+        "Username",
+        placeholder="Enter your username"
+    )
+
+    password = st.text_input(
+        "Password",
+        type="password",
+        placeholder="Enter your password"
+    )
 
     if st.button("Login", use_container_width=True):
-        if username in USERS and USERS[username]["password"] == password:
+        if (
+            username in USERS
+            and USERS[username]["password"] == password
+        ):
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
             st.session_state["role"] = USERS[username]["role"]
             st.rerun()
         else:
             st.error("Incorrect username or password.")
+
 
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -360,12 +537,14 @@ if current_role == "Admin":
         "🚨 Collection & Anomaly",
         "🤖 Risk Prediction"
     ]
+
 elif current_role == "Collection Officer":
     available_pages = [
         "📊 Risk Intelligence",
         "🔎 Customer Investigation",
         "🚨 Collection & Anomaly"
     ]
+
 else:
     available_pages = [
         "🔎 Customer Investigation",
@@ -450,7 +629,8 @@ def show_risk_intelligence():
 
     if selected_category != "All":
         filtered_customers = filtered_customers[
-            filtered_customers["category"].astype(str) == selected_category
+            filtered_customers["category"].astype(str)
+            == selected_category
         ]
 
     filtered_billing = billing.merge(
@@ -470,6 +650,7 @@ def show_risk_intelligence():
         filtered_billing.groupby("billing_month")["units_consumed"]
         .sum().sort_index()
     )
+
     if not monthly_consumption.empty:
         st.line_chart(monthly_consumption)
     else:
@@ -480,6 +661,7 @@ def show_risk_intelligence():
         filtered_billing.groupby("billing_month")["amount_billed"]
         .sum().sort_index()
     )
+
     if not monthly_billing.empty:
         st.line_chart(monthly_billing)
     else:
@@ -489,13 +671,17 @@ def show_risk_intelligence():
 
     with c1:
         st.subheader("Payment Status")
+
         if not filtered_billing.empty:
-            st.bar_chart(filtered_billing["payment_status"].value_counts())
+            st.bar_chart(
+                filtered_billing["payment_status"].value_counts()
+            )
         else:
             st.info("No payment data.")
 
     with c2:
         st.subheader("Consumption Pattern")
+
         if "consumption_pattern" in filtered_billing.columns:
             st.bar_chart(
                 filtered_billing["consumption_pattern"].value_counts()
@@ -514,6 +700,7 @@ def show_risk_intelligence():
             on="consumer_id",
             how="left"
         )
+
         st.bar_chart(
             zone_data.groupby("zone")["amount_billed"]
             .sum().sort_values(ascending=False)
@@ -536,7 +723,10 @@ def show_customer_investigation():
         st.warning("No customer IDs found.")
         return
 
-    selected_customer = st.selectbox("Select Consumer ID", customer_list)
+    selected_customer = st.selectbox(
+        "Select Consumer ID",
+        customer_list
+    )
 
     customer_data = customers[
         customers["consumer_id"].astype(str) == selected_customer
@@ -553,7 +743,10 @@ def show_customer_investigation():
     c2.metric("Category", str(customer.get("category", "N/A")))
     c3.metric("Zone", str(customer.get("zone", "N/A")))
     c4.metric("Area", str(customer.get("area", "N/A")))
-    c5.metric("Sanctioned Load", f'{customer.get("sanctioned_load_kw", 0)} kW')
+    c5.metric(
+        "Sanctioned Load",
+        f'{customer.get("sanctioned_load_kw", 0)} kW'
+    )
 
     customer_billing = billing[
         billing["consumer_id"].astype(str) == selected_customer
@@ -563,16 +756,26 @@ def show_customer_investigation():
 
     if customer_billing.empty:
         st.info("No billing records found.")
+
     else:
         unpaid = customer_billing[
             customer_billing["payment_status"].str.lower() == "unpaid"
         ]
 
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Total Consumption", f'{customer_billing["units_consumed"].sum():,.0f}')
-        c2.metric("Total Billing", f'₹{customer_billing["amount_billed"].sum():,.0f}')
+        c1.metric(
+            "Total Consumption",
+            f'{customer_billing["units_consumed"].sum():,.0f}'
+        )
+        c2.metric(
+            "Total Billing",
+            f'₹{customer_billing["amount_billed"].sum():,.0f}'
+        )
         c3.metric("Unpaid Bills", len(unpaid))
-        c4.metric("Revenue at Risk", f'₹{unpaid["amount_billed"].sum():,.0f}')
+        c4.metric(
+            "Revenue at Risk",
+            f'₹{unpaid["amount_billed"].sum():,.0f}'
+        )
 
         st.subheader("Monthly Consumption")
         st.line_chart(
@@ -581,13 +784,19 @@ def show_customer_investigation():
         )
 
         display_columns = [
-            "billing_month", "units_consumed", "amount_billed",
-            "payment_status", "due_date", "payment_date"
+            "billing_month",
+            "units_consumed",
+            "amount_billed",
+            "payment_status",
+            "due_date",
+            "payment_date"
         ]
+
         display_columns = [
             col for col in display_columns
             if col in customer_billing.columns
         ]
+
         st.dataframe(
             customer_billing[display_columns],
             use_container_width=True,
@@ -595,6 +804,7 @@ def show_customer_investigation():
         )
 
     st.subheader("Customer Anomalies")
+
     customer_anomalies = anomalies[
         anomalies["consumer_id"].astype(str).str.strip().str.upper()
         == selected_customer.strip().upper()
@@ -603,7 +813,11 @@ def show_customer_investigation():
     if customer_anomalies.empty:
         st.success("No anomaly records found.")
     else:
-        st.dataframe(customer_anomalies, use_container_width=True, hide_index=True)
+        st.dataframe(
+            customer_anomalies,
+            use_container_width=True,
+            hide_index=True
+        )
 
     # Record a collection action
     st.divider()
@@ -612,14 +826,36 @@ def show_customer_investigation():
     with st.form("collection_action_form"):
         action_type = st.selectbox(
             "Action Type",
-            ["Phone Call", "SMS", "Payment Reminder", "Notice", "Field Visit"]
+            [
+                "Phone Call",
+                "SMS",
+                "Payment Reminder",
+                "Notice",
+                "Field Visit"
+            ]
         )
+
         action_outcome = st.selectbox(
             "Action Outcome",
-            ["Pending", "Contacted", "Promised Payment", "Recovered", "No Response"]
+            [
+                "Pending",
+                "Contacted",
+                "Promised Payment",
+                "Recovered",
+                "No Response"
+            ]
         )
-        amount_targeted = st.number_input("Amount Targeted (₹)", min_value=0.0)
-        amount_recovered = st.number_input("Amount Recovered (₹)", min_value=0.0)
+
+        amount_targeted = st.number_input(
+            "Amount Targeted (₹)",
+            min_value=0.0
+        )
+
+        amount_recovered = st.number_input(
+            "Amount Recovered (₹)",
+            min_value=0.0
+        )
+
         officer_id = st.text_input("Officer ID")
         notes = st.text_area("Notes")
 
@@ -628,9 +864,12 @@ def show_customer_investigation():
         if submitted:
             if not officer_id.strip():
                 st.warning("Enter an Officer ID.")
+
             else:
                 new_action = {
-                    "action_id": "ACTION_" + datetime.now().strftime("%Y%m%d%H%M%S%f"),
+                    "action_id": "ACTION_" + datetime.now().strftime(
+                        "%Y%m%d%H%M%S%f"
+                    ),
                     "consumer_id": selected_customer,
                     "action_date": datetime.now().strftime("%Y-%m-%d"),
                     "action_type": action_type,
@@ -643,20 +882,30 @@ def show_customer_investigation():
 
                 try:
                     updated = pd.concat(
-                        [collection_actions, pd.DataFrame([new_action])],
+                        [
+                            collection_actions,
+                            pd.DataFrame([new_action])
+                        ],
                         ignore_index=True
                     )
-                    updated.to_csv(DATA_DIR / "collection_actions.csv", index=False)
+
+                    updated.to_csv(
+                        DATA_DIR / "collection_actions.csv",
+                        index=False
+                    )
+
                     st.cache_data.clear()
                     st.success("Collection action saved.")
                     st.warning(
                         "Streamlit Cloud may not preserve CSV changes "
                         "after restart or redeployment."
                     )
+
                 except Exception as error:
                     st.error(f"Could not save the action: {error}")
 
     st.subheader("Collection Action History")
+
     customer_actions = collection_actions[
         collection_actions["consumer_id"].astype(str).str.strip()
         == selected_customer.strip()
@@ -665,7 +914,11 @@ def show_customer_investigation():
     if customer_actions.empty:
         st.info("No collection actions found.")
     else:
-        st.dataframe(customer_actions, use_container_width=True, hide_index=True)
+        st.dataframe(
+            customer_actions,
+            use_container_width=True,
+            hide_index=True
+        )
 
 # ============================================================
 # PAGE 3: COLLECTION & ANOMALY
@@ -680,16 +933,32 @@ def show_collection_anomaly():
 
     targeted = collection_actions["amount_targeted"].sum()
     recovered = collection_actions["amount_recovered"].sum()
-    recovery_rate = recovered / targeted * 100 if targeted else 0
+
+    recovery_rate = (
+        recovered / targeted * 100 if targeted else 0
+    )
 
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Unpaid Customers", f'{unpaid["consumer_id"].nunique():,}')
-    c2.metric("Revenue at Risk", f'₹{unpaid["amount_billed"].sum():,.0f}')
+
+    c1.metric(
+        "Unpaid Customers",
+        f'{unpaid["consumer_id"].nunique():,}'
+    )
+    c2.metric(
+        "Revenue at Risk",
+        f'₹{unpaid["amount_billed"].sum():,.0f}'
+    )
     c3.metric("Anomaly Cases", f"{len(anomalies):,}")
     c4.metric("Collection Actions", f"{len(collection_actions):,}")
-    c5.metric("Recovered Actions", int(
-        (collection_actions["action_outcome"].str.lower() == "recovered").sum()
-    ))
+    c5.metric(
+        "Recovered Actions",
+        int(
+            (
+                collection_actions["action_outcome"].str.lower()
+                == "recovered"
+            ).sum()
+        )
+    )
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Amount Targeted", f"₹{targeted:,.0f}")
@@ -700,11 +969,14 @@ def show_collection_anomaly():
 
     with c1:
         st.subheader("Unpaid Customers by Zone")
+
         if not unpaid.empty:
             zone_data = unpaid.merge(
                 customers[["consumer_id", "zone"]].drop_duplicates(),
-                on="consumer_id", how="left"
+                on="consumer_id",
+                how="left"
             )
+
             st.bar_chart(
                 zone_data.groupby("zone")["consumer_id"]
                 .nunique().sort_values(ascending=False)
@@ -714,12 +986,15 @@ def show_collection_anomaly():
 
     with c2:
         st.subheader("Collection Outcomes")
-        st.bar_chart(collection_actions["action_outcome"].value_counts())
+        st.bar_chart(
+            collection_actions["action_outcome"].value_counts()
+        )
 
     c1, c2 = st.columns(2)
 
     with c1:
         st.subheader("Anomaly Types")
+
         if "anomaly_type" in anomalies.columns:
             st.bar_chart(anomalies["anomaly_type"].value_counts())
         else:
@@ -727,14 +1002,23 @@ def show_collection_anomaly():
 
     with c2:
         st.subheader("Anomaly Cases by Zone")
+
         zone_data = anomalies.merge(
             customers[["consumer_id", "zone"]].drop_duplicates(),
-            on="consumer_id", how="left"
+            on="consumer_id",
+            how="left"
         )
-        st.bar_chart(zone_data.groupby("zone")["consumer_id"].count())
+
+        st.bar_chart(
+            zone_data.groupby("zone")["consumer_id"].count()
+        )
 
     st.subheader("Recent Anomaly Records")
-    st.dataframe(anomalies.head(100), use_container_width=True, hide_index=True)
+    st.dataframe(
+        anomalies.head(100),
+        use_container_width=True,
+        hide_index=True
+    )
 
 # ============================================================
 # PAGE 4: RISK PREDICTION
@@ -747,13 +1031,28 @@ def show_risk_prediction():
         risk_predictions["risk_level"] == "HIGH"
     ].copy()
 
-    low_count = (risk_predictions["risk_level"] == "LOW").sum()
-    medium_count = (risk_predictions["risk_level"] == "MEDIUM").sum()
+    low_count = (
+        risk_predictions["risk_level"] == "LOW"
+    ).sum()
+
+    medium_count = (
+        risk_predictions["risk_level"] == "MEDIUM"
+    ).sum()
 
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Risk-Scored Customers", f'{risk_predictions["consumer_id"].nunique():,}')
-    c2.metric("High-Risk Customers", f'{high_risk["consumer_id"].nunique():,}')
-    c3.metric("Average Risk Score", f'{risk_predictions["risk_score"].mean():.2f}')
+
+    c1.metric(
+        "Risk-Scored Customers",
+        f'{risk_predictions["consumer_id"].nunique():,}'
+    )
+    c2.metric(
+        "High-Risk Customers",
+        f'{high_risk["consumer_id"].nunique():,}'
+    )
+    c3.metric(
+        "Average Risk Score",
+        f'{risk_predictions["risk_score"].mean():.2f}'
+    )
     c4.metric("Low-Risk Records", int(low_count))
     c5.metric("Medium-Risk Records", int(medium_count))
 
@@ -761,24 +1060,32 @@ def show_risk_prediction():
 
     with c1:
         st.subheader("Risk Level Distribution")
-        st.bar_chart(risk_predictions["risk_level"].value_counts())
+        st.bar_chart(
+            risk_predictions["risk_level"].value_counts()
+        )
 
     with c2:
         st.subheader("High-Risk Customers by Zone")
+
         high_zone = high_risk.merge(
             customers[["consumer_id", "zone"]].drop_duplicates(),
-            on="consumer_id", how="left"
+            on="consumer_id",
+            how="left"
         )
+
         st.bar_chart(
             high_zone.groupby("zone")["consumer_id"]
             .nunique().sort_values(ascending=False)
         )
 
     st.subheader("Average Risk Score by Zone")
+
     risk_zone = risk_predictions.merge(
         customers[["consumer_id", "zone"]].drop_duplicates(),
-        on="consumer_id", how="left"
+        on="consumer_id",
+        how="left"
     )
+
     st.bar_chart(
         risk_zone.groupby("zone")["risk_score"]
         .mean().sort_values(ascending=False)
@@ -788,6 +1095,7 @@ def show_risk_prediction():
     st.line_chart(risk_predictions[["risk_score"]])
 
     st.subheader("Model Information")
+
     c1, c2, c3 = st.columns(3)
     c1.metric("Model", "Logistic Regression")
     c2.metric("Accuracy", "71.65%")
@@ -799,8 +1107,17 @@ def show_risk_prediction():
     )
 
     st.subheader("Customer Risk Prioritization")
-    risk_table = risk_predictions.sort_values("risk_score", ascending=False)
-    st.dataframe(risk_table, use_container_width=True, hide_index=True)
+
+    risk_table = risk_predictions.sort_values(
+        "risk_score",
+        ascending=False
+    )
+
+    st.dataframe(
+        risk_table,
+        use_container_width=True,
+        hide_index=True
+    )
 
 # ============================================================
 # 14. PAGE ROUTING
