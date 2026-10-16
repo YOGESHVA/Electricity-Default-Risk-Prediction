@@ -1,4 +1,11 @@
+## 🚀 Live Demo
+
+**[Click here to view the deployed Streamlit application](https://electricity-default-risk-prediction-fcqzuweqbgxp8ucq6rzpa6.streamlit.app/)**
+
+
 # ⚡ Electricity Consumption & Bill Default Risk Prediction
+
+
 
 An end-to-end data analytics and machine learning project that analyzes electricity consumption, billing behavior, payment defaults, and abnormal consumption patterns.
 
